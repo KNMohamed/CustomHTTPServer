@@ -1,17 +1,12 @@
 package com.http;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 public class Client implements Runnable {
-    private static final int port = 8080;
-
     public static final String HTTP_1_1 = "HTTP/1.1";
     public static final String CRLF = "\r\n";
 
@@ -28,7 +23,7 @@ public class Client implements Runnable {
     private final int id;
     private final Socket socket;
 
-    public Client(Socket socket) throws IOException {
+    public Client(Socket socket) {
         this.id = ID_INCREMENT.incrementAndGet();
         this.socket = socket;
     }
@@ -101,7 +96,17 @@ public class Client implements Runnable {
         };
     }
 
-    private Response handlePost(Request request) {
+    private Response handlePost(Request request) throws IOException {
+        {
+            final var match = FILE_PATTERN.matcher(request.path());
+            if (match.find()) {
+                final var path = match.group(1);
+                try(final var outputStream = new FileOutputStream(new File(Main.WORKING_DIRECTORY, path))) {
+                    outputStream.write(request.body());
+                }
+                return Response.status(Status.CREATED);
+            }
+        }
         return Response.status(Status.NOT_FOUND);
     }
 
