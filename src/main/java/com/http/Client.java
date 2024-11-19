@@ -1,6 +1,9 @@
 package com.http;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.net.Socket;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -18,13 +21,14 @@ public class Client implements Runnable {
     private static final byte[] COLON_SPACE_BYTE = {':', ' '};
 
     private static final Pattern ECHO_PATTERN = Pattern.compile("/echo/(.*)");
+    private static final Pattern FILE_PATTERN = Pattern.compile("/files/(.*)");
 
     private static final AtomicInteger ID_INCREMENT = new AtomicInteger();
 
     private final int id;
     private final Socket socket;
 
-    private Client(Socket socket) throws IOException {
+    public Client(Socket socket) throws IOException {
         this.id = ID_INCREMENT.incrementAndGet();
         this.socket = socket;
     }
@@ -63,7 +67,7 @@ public class Client implements Runnable {
         if (!HTTP_1_1.equals(version)) {
             throw new IllegalStateException("unsupported version " + version);
         }
-        if (!scanner.hasNext()) {
+        if (scanner.hasNext()) {
             throw new IllegalStateException("content after version: " + scanner.next());
         }
 
@@ -101,7 +105,7 @@ public class Client implements Runnable {
         return Response.status(Status.NOT_FOUND);
     }
 
-    private Response handleGet(Request request) {
+    private Response handleGet(Request request) throws IOException {
         if (request.path().equals("/")) {
             return Response.status(Status.OK);
         }
@@ -116,6 +120,15 @@ public class Client implements Runnable {
             if (matcher.find()) {
                 final var message = matcher.group(1);
                 return Response.plainText(message);
+            }
+        }
+
+        {
+            final var matcher = FILE_PATTERN.matcher(request.path());
+            if (matcher.find()) {
+                final var filename = matcher.group(1);
+                final var file = new File(Main.WORKING_DIRECTORY, filename);
+                return Response.file(file);
             }
         }
 
