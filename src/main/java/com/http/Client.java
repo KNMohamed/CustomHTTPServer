@@ -6,7 +6,7 @@ import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-public class Client implements Runnable{
+public class Client implements Runnable {
     private static final int port = 8080;
 
     public static final String HTTP_1_1 = "HTTP/1.1";
@@ -15,7 +15,7 @@ public class Client implements Runnable{
     private static final byte[] HTTP_1_1_BYTES = HTTP_1_1.getBytes();
     private static final byte[] CRLF_BYTES = CRLF.getBytes();
     private static final byte SPACE_BYTE = ' ';
-    private static final byte[] COLON_SPACE_BYTE = { ':', ' ' };
+    private static final byte[] COLON_SPACE_BYTE = {':', ' '};
 
     private static final Pattern ECHO_PATTERN = Pattern.compile("/echo/(.*)");
 
@@ -40,6 +40,7 @@ public class Client implements Runnable{
             final var request = parse(inputStream);
 
             final var response = handle(request);
+            send(response, outputStream);
         } catch (IOException ex) {
             System.err.printf("%d: returned an error: %s%n", id, ex.getMessage());
             ex.printStackTrace();
@@ -55,14 +56,14 @@ public class Client implements Runnable{
         final var method = Method.valueOf(scanner.next());
         final var path = scanner.next();
 
-        if(!path.startsWith("/")) {
+        if (!path.startsWith("/")) {
             throw new IllegalStateException("path does not start with a slash: " + path);
         }
         final var version = scanner.next();
-        if(!HTTP_1_1.equals(version)) {
+        if (!HTTP_1_1.equals(version)) {
             throw new IllegalStateException("unsupported version " + version);
         }
-        if(!scanner.hasNext()) {
+        if (!scanner.hasNext()) {
             throw new IllegalStateException("content after version: " + scanner.next());
         }
 
@@ -91,17 +92,71 @@ public class Client implements Runnable{
 
     public Response handle(Request request) throws IOException {
         return switch (request.method()) {
-          case GET -> handleGet(request);
-          case POST -> handlePost(request);
+            case GET -> handleGet(request);
+            case POST -> handlePost(request);
         };
     }
 
     private Response handlePost(Request request) {
-        return Response.status(Status.OK);
+        return Response.status(Status.NOT_FOUND);
     }
 
     private Response handleGet(Request request) {
-        return Response.status(Status.OK);
+        if (request.path().equals("/")) {
+            return Response.status(Status.OK);
+        }
+
+        if (request.path().equals("/user-agent")) {
+            final var userAgent = request.headers().userAgent();
+            return Response.plainText(userAgent);
+        }
+
+        {
+            final var matcher = ECHO_PATTERN.matcher(request.path());
+            if (matcher.find()) {
+                final var message = matcher.group(1);
+                return Response.plainText(message);
+            }
+        }
+
+        return Response.status(Status.NOT_FOUND);
+    }
+
+    private void send(Response response, BufferedOutputStream outputStream) throws IOException {
+        outputStream.write(HTTP_1_1_BYTES);
+        outputStream.write(SPACE_BYTE);
+
+        outputStream.write(response.status().line().getBytes());
+        outputStream.write(CRLF_BYTES);
+
+        for (final var entry : response.headers().entrySet()) {
+            final var key = entry.getKey();
+            if (Headers.CONTENT_LENGTH.equalsIgnoreCase(key)) {
+                continue;
+            }
+
+            final var value = entry.getValue();
+
+            outputStream.write(key.getBytes());
+            outputStream.write(COLON_SPACE_BYTE);
+            outputStream.write(value.getBytes());
+            outputStream.write(CRLF_BYTES);
+        }
+
+        final var body = response.body();
+        if (body != null) {
+            outputStream.write(Headers.CONTENT_LENGTH.getBytes());
+            outputStream.write(COLON_SPACE_BYTE);
+            outputStream.write(String.valueOf(body.length).getBytes());
+            outputStream.write(CRLF_BYTES);
+        }
+
+        outputStream.write(CRLF_BYTES);
+        if (body != null) {
+            outputStream.write(body);
+        }
+
+        outputStream.flush();
     }
 
     private String nextLine(BufferedInputStream inputStream) throws IOException {
