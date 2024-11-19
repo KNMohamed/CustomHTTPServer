@@ -39,12 +39,21 @@ public class Client implements Runnable {
             final var request = parse(inputStream);
 
             final var response = handle(request);
+
+            middleware(request, response);
             send(response, outputStream);
         } catch (IOException ex) {
             System.err.printf("%d: returned an error: %s%n", id, ex.getMessage());
             ex.printStackTrace();
         }
         System.out.printf("%d: disconnected%n", id);
+    }
+
+    private void middleware(Request request, Response response) {
+        String acceptEncoding;
+        if ((acceptEncoding = request.headers().acceptEncoding()) != null) {
+            response.headers().put(Headers.CONTENT_ENCODING, acceptEncoding);
+        }
     }
 
     public Request parse(BufferedInputStream inputStream) throws IOException {
@@ -101,7 +110,7 @@ public class Client implements Runnable {
             final var match = FILE_PATTERN.matcher(request.path());
             if (match.find()) {
                 final var path = match.group(1);
-                try(final var outputStream = new FileOutputStream(new File(Main.WORKING_DIRECTORY, path))) {
+                try (final var outputStream = new FileOutputStream(new File(Main.WORKING_DIRECTORY, path))) {
                     outputStream.write(request.body());
                 }
                 return Response.status(Status.CREATED);

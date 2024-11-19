@@ -4,16 +4,18 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.Set;
 
-public class Headers implements Cloneable{
+public class Headers implements Cloneable {
 
     private final Map<String, String> storage;
 
+    public static final String ACCEPT_ENCODING = "Accept-Encoding";
+    public static final String CONTENT_ENCODING = "Content-Encoding";
     public static final String CONTENT_LENGTH = "Content-Length";
     public static final String CONTENT_TYPE = "Content-Type";
     public static final String USER_AGENT = "User-Agent";
 
     public Headers() {
-        this.storage = new TreeMap<String, String>(String.CASE_INSENSITIVE_ORDER);
+        this.storage = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     }
 
     public Headers(Headers headers) {
@@ -28,6 +30,10 @@ public class Headers implements Cloneable{
 
     public String userAgent() {
         return storage.get(USER_AGENT);
+    }
+
+    public String acceptEncoding() {
+        return storage.get(ACCEPT_ENCODING);
     }
 
     public Headers put(String key, String value) {
